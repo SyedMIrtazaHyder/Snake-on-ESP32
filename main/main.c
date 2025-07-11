@@ -1,8 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "driver/spi_master.h"
+#include "esp_random.h"
 
 #include "sdkconfig.h"
 
@@ -59,7 +61,7 @@ static void initSPI(){
     ESP_ERROR_CHECK(ret);
 }
 
-void send_data(uint8_t addr, uint8_t data){
+void sendData(uint8_t addr, uint8_t data){
     // if using dynamic memory we need to free this later as well
     // uint8_t *spi_send = (uint8_t *) malloc (8*2); // allocating dynamic array of 16 bits that has the address and data we need to write to
     // spi_send[0] = addr;
@@ -78,31 +80,89 @@ void send_data(uint8_t addr, uint8_t data){
 }
 
 static void initMAX7219(){
-    send_data(DISPLAY_TEST, 0); // by default it is 1 idk why
-    send_data(SCAN_LIMIT, 0x07); // so all 8 rows display
-    send_data(DECODE_MODE, 0x00); // set to 1 when using BCD convertor
-    send_data(INTENSITY, 0x07); // 0.5 duty cycle
-    send_data(SHUTDOWN, 1);
+    sendData(DISPLAY_TEST, 0); // by default it is 1 idk why
+    sendData(SCAN_LIMIT, 0x07); // so all 8 rows display
+    sendData(DECODE_MODE, 0x00); // set to 1 when using BCD convertor
+    sendData(INTENSITY, 0x07); // 0.5 duty cycle
+    sendData(SHUTDOWN, 1);
 }
 
 static void clear(){
-    for (uint8_t i = 1; i < 9; i++) send_data(i, 0x00);
+    for (uint8_t i = 1; i < 9; i++) sendData(i, 0x00);
 }
 
-static void displayDots(void *pvParameteres){
+void displaySnake(){
     initSPI();
     initMAX7219();
     clear(); // prevent weird glitch when initializing the sensor
 
-    for (;;){
-        uint8_t spi_data[2] = {*(uint8_t *) pvParameteres, *(uint8_t *) (pvParameteres + sizeof(uint8_t))};
-        send_data(spi_data[0], spi_data[1]);
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        clear();
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        // addition is in bytes so sizeof also given in bytes
-        printf("LED Blink %d %d\n", sizeof(uint8_t), sizeof(uint16_t));
+    // making the snake initially only 2 dots long
+    //generating random row and column to spawn snake in
+    uint8_t length = 3; // we need to track of this manually as sizeof(dynamic array) never works, because to sizeof it would always give uint8_t type...
+    uint8_t *snake_position = (uint8_t *) malloc (sizeof(uint8_t) * length * 2); // as it will have x and y positions and we are testing with a snake of length 3
+    int count = 0;
+    uint8_t row = (uint8_t) esp_random()%7 + 1;
+    uint8_t col = 1 << ((uint8_t) esp_random()%8);
+    // TODO: need to fix controls so that if UP and DOWN or RIGHT and LEFT are pressed together the game ends
+    enum Direction {
+        UP,
+        LEFT,
+        DOWN,
+        RIGHT};
+
+    // snakes attributes
+    snake_position[0] = row; // snake head row
+    snake_position[1] = col; // snake head column
+
+    for (int i = 1; i < length; i++){
+        snake_position[2*i] = (row - i)%8;
+        snake_position[2*i + 1] = col;
     }
+
+    enum Direction dir = UP;
+
+    for(;;){
+        clear();
+        count += 1;
+        
+        // displaying snakes position
+        for(int i = 0; i < length; i++)
+            sendData(snake_position[2*i], snake_position[2*i+1]);
+
+        // updating snake's position
+        // hardcoding snake movement to test movement logic
+        if (!(count % 3)) dir = (dir + 1)%4;
+
+        switch(dir){
+            case UP:
+                row = (row)%8 + 1;
+                break;
+            case DOWN:
+                row = (row - 1) ? row - 1: 8; // if row no. is 1, the new row to go to would be 8 
+                break;
+            case RIGHT:
+                col = (col >> 1) > 0 ? (col >> 1) : 128;
+                break;
+            case LEFT:
+                col = (col << 1) > 0 ? (col << 1) : 1;
+                break;
+        }
+
+        // shifting everything in the array towards the right and discarding the last element
+        for(int i = length - 1; i > 0; i--){
+            snake_position[2*i] = snake_position[2*i - 2];
+            snake_position[2*i + 1] = snake_position[2*i - 1];
+            printf("New value %d: %d, %d\n", i, snake_position[2*i], snake_position[2*i + 1]);
+        }
+
+        snake_position[0] = row;
+        snake_position[1] = col;
+        printf("New value 0: %d, %d\n", snake_position[0], snake_position[1]);
+
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+    // code should never come here
+    free(snake_position);
 }
 
 void app_main(void)
@@ -110,7 +170,7 @@ void app_main(void)
     TaskHandle_t display_handle = NULL;
     uint8_t spi_data[2] = {0x01, 0x08};
 
-    xTaskCreatePinnedToCore(displayDots, "led_display", 2048, (void *) spi_data, 2, &display_handle, 1);
+    xTaskCreate(displaySnake, "snake", 4096, (void *) spi_data, 2, &display_handle);
 
     while(1){
         printf("Running main task\n");
