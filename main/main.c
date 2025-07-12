@@ -28,6 +28,7 @@
 
 
 spi_device_handle_t dot_matrix = NULL;
+static uint8_t grid[8];
 
 static void initSPI(){
     esp_err_t ret; 
@@ -91,18 +92,36 @@ static void clear(){
     for (uint8_t i = 1; i < 9; i++) sendData(i, 0x00);
 }
 
+static void rcToLED(uint8_t *arr, uint8_t const length){
+    uint8_t row, col;
+    uint8_t addr, data = 0;
+    for (int i = 0; i < length; i++){
+        row = arr[2*i];
+        col = arr[2*i + 1];
+
+        if (i != length - 1 && row == arr[2*i + 2]){ 
+            data |= (1 << col); // ORing the points which are in the same row to generate the column byte
+            continue;
+        }
+
+        if (i == length - 1 && row == arr[2*i - 2]) data |= (1 << col);
+        addr = row + 1; // row + 1 as the starting row address is 0x01 and the last row address is 0x08
+        sendData(addr, data);
+        data = 0;
+    }
+}
+
 void displaySnake(){
     initSPI();
     initMAX7219();
     clear(); // prevent weird glitch when initializing the sensor
 
-    // making the snake initially only 2 dots long
     //generating random row and column to spawn snake in
     uint8_t length = 3; // we need to track of this manually as sizeof(dynamic array) never works, because to sizeof it would always give uint8_t type...
     uint8_t *snake_position = (uint8_t *) malloc (sizeof(uint8_t) * length * 2); // as it will have x and y positions and we are testing with a snake of length 3
     int count = 0;
-    uint8_t row = (uint8_t) esp_random()%7 + 1;
-    uint8_t col = 1 << ((uint8_t) esp_random()%8);
+    uint8_t row = (uint8_t) esp_random()%8;
+    uint8_t col = (uint8_t) esp_random()%8;
     // TODO: need to fix controls so that if UP and DOWN or RIGHT and LEFT are pressed together the game ends
     enum Direction {
         UP,
@@ -133,18 +152,21 @@ void displaySnake(){
         // hardcoding snake movement to test movement logic
         if (!(count % 3)) dir = (dir + 1)%4;
 
+        // need to do seperately for - as if gets a -ve value after mod, but after storing it becomes unsigned so mod now applicable
         switch(dir){
             case UP:
-                row = (row)%8 + 1;
+                row = (row + 1)%8;
                 break;
             case DOWN:
-                row = (row - 1) ? row - 1: 8; // if row no. is 1, the new row to go to would be 8 
-                break;
-            case RIGHT:
-                col = (col >> 1) > 0 ? (col >> 1) : 128;
+                row = row - 1;
+                row %= 8;
                 break;
             case LEFT:
-                col = (col << 1) > 0 ? (col << 1) : 1;
+                col = (col + 1)%8;
+                break;
+            case RIGHT:
+                col = col - 1;
+                col %= 8;
                 break;
         }
 
@@ -152,13 +174,13 @@ void displaySnake(){
         for(int i = length - 1; i > 0; i--){
             snake_position[2*i] = snake_position[2*i - 2];
             snake_position[2*i + 1] = snake_position[2*i - 1];
-            printf("New value %d: %d, %d\n", i, snake_position[2*i], snake_position[2*i + 1]);
+            printf("Position %d: %d, %d", i, snake_position[2*i], snake_position[2*i + 1]);
         }
-
         snake_position[0] = row;
         snake_position[1] = col;
-        printf("New value 0: %d, %d\n", snake_position[0], snake_position[1]);
+        printf("Position 0: %d, %d", snake_position[0], snake_position[1]);
 
+        rcToLED(snake_position, length);
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
     // code should never come here
