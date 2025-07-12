@@ -112,6 +112,23 @@ static void rcToLED(uint8_t *arr, uint8_t const length){
     }
 }
 
+void setApple(){
+	// Oring the apple location with the grid where the snake exists, so if the apple overlaps the snake we regenerate it. These are pseudo random for now...
+	// TODO: Update the code to utilize bootloader randomness
+	uint8_t row = esp_random()%8;
+	uint8_t col = esp_random()%8;
+	
+	while (grid[row] == 0xFF) row = random()%8;
+
+	while ((grid[row] | (1 << col)) == grid[row]){
+		col = random()%8;
+		row = random()%8;
+	}
+
+	uint8_t apple_loc[2] = {row, col};
+	rcToLED(apple_loc, 1);
+}
+
 void displaySnake(){
     initSPI();
     initMAX7219();
@@ -192,7 +209,9 @@ void displaySnake(){
         snake_position[1] = col;
         //printf("Position 0: %d, %d", snake_position[0], snake_position[1]);
 
+        //updating grid
         rcToLED(snake_position, length);
+		setApple();
         displayGrid();
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
