@@ -13,6 +13,8 @@
 #define CS 15
 #define HOST SPI2_HOST
 
+#define TURN_AFTER 3
+
 // reference https://www.embeddedexplorer.com/esp32-spi-master/
 // https://www.analog.com/media/en/technical-documentation/data-sheets/MAX7219-MAX7221.pdf
 // current code does not display anything idk why
@@ -88,26 +90,25 @@ static void initMAX7219(){
     sendData(SHUTDOWN, 1);
 }
 
+static void clearGrid(){
+    for (uint8_t i = 0; i < 8; i++) grid[i] = 0;
+}
+
+static void displayGrid(){
+    for (uint8_t i = 1; i < 9; i++) sendData(i, grid[i-1]);
+}
+
 static void clear(){
-    for (uint8_t i = 1; i < 9; i++) sendData(i, 0x00);
+    clearGrid();
+    displayGrid();
 }
 
 static void rcToLED(uint8_t *arr, uint8_t const length){
     uint8_t row, col;
-    uint8_t addr, data = 0;
     for (int i = 0; i < length; i++){
-        row = arr[2*i];
-        col = arr[2*i + 1];
-
-        if (i != length - 1 && row == arr[2*i + 2]){ 
-            data |= (1 << col); // ORing the points which are in the same row to generate the column byte
-            continue;
-        }
-
-        if (i == length - 1 && row == arr[2*i - 2]) data |= (1 << col);
-        addr = row + 1; // row + 1 as the starting row address is 0x01 and the last row address is 0x08
-        sendData(addr, data);
-        data = 0;
+		row = arr[2*i];
+		col = arr[2*i + 1];
+		grid[row] = grid[row] | (1 << col);
     }
 }
 
@@ -118,7 +119,7 @@ void displaySnake(){
 
     //generating random row and column to spawn snake in
     uint8_t length = 3; // we need to track of this manually as sizeof(dynamic array) never works, because to sizeof it would always give uint8_t type...
-    uint8_t *snake_position = (uint8_t *) malloc (sizeof(uint8_t) * length * 2); // as it will have x and y positions and we are testing with a snake of length 3
+    uint8_t snake_position[64*2] = {0}; // as it will have x and y positions and we are testing with a snake of length 3
     int count = 0;
     uint8_t row = (uint8_t) esp_random()%8;
     uint8_t col = (uint8_t) esp_random()%8;
@@ -144,13 +145,24 @@ void displaySnake(){
         clear();
         count += 1;
         
-        // displaying snakes position
-        for(int i = 0; i < length; i++)
-            sendData(snake_position[2*i], snake_position[2*i+1]);
-
         // updating snake's position
         // hardcoding snake movement to test movement logic
-        if (!(count % 3)) dir = (dir + 1)%4;
+        if (!(count % TURN_AFTER)){
+			switch(dir){
+				case UP:
+					dir = LEFT;
+					break;
+				case LEFT:
+					dir = DOWN;
+					break;
+				case DOWN:
+					dir = RIGHT;
+					break;
+				case RIGHT:
+					dir = UP;
+					break;
+			}
+		}
 
         // need to do seperately for - as if gets a -ve value after mod, but after storing it becomes unsigned so mod now applicable
         switch(dir){
@@ -174,13 +186,14 @@ void displaySnake(){
         for(int i = length - 1; i > 0; i--){
             snake_position[2*i] = snake_position[2*i - 2];
             snake_position[2*i + 1] = snake_position[2*i - 1];
-            printf("Position %d: %d, %d", i, snake_position[2*i], snake_position[2*i + 1]);
+            //printf("Position %d: %d, %d", i, snake_position[2*i], snake_position[2*i + 1]);
         }
         snake_position[0] = row;
         snake_position[1] = col;
-        printf("Position 0: %d, %d", snake_position[0], snake_position[1]);
+        //printf("Position 0: %d, %d", snake_position[0], snake_position[1]);
 
         rcToLED(snake_position, length);
+        displayGrid();
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
     // code should never come here
