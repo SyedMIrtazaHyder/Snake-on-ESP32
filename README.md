@@ -32,3 +32,4 @@ Develop Snake for the ESP32. Display is on 8x8 Dot Matrix LED (MAX7219 encoder)
 ## Potential Improvements
 1. Control using Python Script. Was unable to make UART work with Python
 2. Change Controller to Bluetooth or Wifi or JoyStick.
+3. Implement a Snake Solver.
