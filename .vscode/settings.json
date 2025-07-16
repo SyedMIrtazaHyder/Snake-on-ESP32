@@ -15,5 +15,9 @@
     "--background-index",
     "--query-driver=/home/edzard/.espressif/tools/xtensa-esp-elf/esp-14.2.0_20241119/xtensa-esp-elf/bin/xtensa-esp32-elf-gcc",
     "--compile-commands-dir=${workspaceFolder}/build"
-  ]
+  ],
+  "files.associations": {
+    "uart_controller.h": "c",
+    "freertos.h": "c"
+  }
 }
