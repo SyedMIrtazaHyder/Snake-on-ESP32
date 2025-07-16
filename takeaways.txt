@@ -1,0 +1,6 @@
+Key Takeaways
+
+1. For SPI we first configure the spi bus, then register the spi device and then send data on the bus.
+2. For UART we first initialize the uart (0~MAX_UART - 1), then configure the UART, then configure the pins (RX, TX, CTS, RTS) where RTS and CTS are optional. Used UART 0 which is used for serial monitor debugging (as I did not have the dongle)
+3. For JTAG debugging need WROOMER (or any model with builtin JTAG) or a JTAG adapter device.
+4. internal and external linkage and multiple definition error. I.e in the header file I used `vartype varname` which is definiation as it gives varname a garbage value. For decleration use `extern vartype varname`. Functions are extern by default. Internal linkage is done via using the static keyword.
