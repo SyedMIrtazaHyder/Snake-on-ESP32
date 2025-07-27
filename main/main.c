@@ -5,8 +5,7 @@
 #include "snake.h"
 #include "uart_controller.h"
 
-void app_main(void)
-{
+void app_main(void){
     init_uart();
 
     TaskHandle_t display_handle = NULL;
