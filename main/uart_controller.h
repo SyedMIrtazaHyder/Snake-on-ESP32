@@ -13,7 +13,7 @@
 
 #define INPUT_RATE 2 // Hz
 
-extern char rx_buffer; 
+extern char rx_buffer;
 
 void init_uart();
 char rx_read();

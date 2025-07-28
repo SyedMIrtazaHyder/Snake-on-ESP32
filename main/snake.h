@@ -7,5 +7,5 @@
 
 #define REFRESH_RATE 1 // Hz
 
-void moveSnake(char c);
-void displayGame();
+void move_snake(char c);
+void display_game();

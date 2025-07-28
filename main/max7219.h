@@ -18,9 +18,9 @@
 
 extern uint8_t grid[8];
 
-void initSPI();
-void initMAX7219();
-void sendData(uint8_t addr, uint8_t data);
-void displayGrid();
-void clearGrid();
-void rcToLED(const uint8_t *arr, const uint8_t length);
+void init_spi();
+void init_max7219();
+void send_data(uint8_t addr, uint8_t data);
+void display_grid();
+void clear_grid();
+void rc_to_led(const uint8_t *arr, const uint8_t length);
